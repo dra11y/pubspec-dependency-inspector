@@ -8,6 +8,7 @@ export interface Dependency {
     currentVersion: string;
     latestVersion?: string;
     updateAvailable?: boolean;
+    ignored?: boolean;
     dependencyStartOffset: number;
     dependencyEndOffset: number;
     currentVersionStartOffset: number;
@@ -80,6 +81,7 @@ export function readPackageLines(
     let line = '';
     let counter = 0;
     let dependenciesReached = false;
+    let ignoreCurrentOrNext = false;
 
 
     for (let i = 0; i < fileContent.length; i++) {
@@ -91,7 +93,12 @@ export function readPackageLines(
                 dependenciesReached = true;
             }
 
-            if (!line.startsWith('#') && isPubPackageName(line) && dependenciesReached) {
+            if (/#.*(ignore|pin)/i.test(line)) {
+                ignoreCurrentOrNext = true;
+                console.log(`found ignore: ${line}`);
+            }
+
+            if (!/^\s*#/.test(line) && isPubPackageName(line) && dependenciesReached) {
                 // TODO: get dependency name and version
                 var name = getDependencyName(line);
                 var version = getDependencyVersion(line);
@@ -100,14 +107,17 @@ export function readPackageLines(
                 var hasPrefix = version[2];
                 var versionStart = dependencyStart + name.length + 2;
                 var versionEnd = versionStart + version[1];
-                console.log(`name: ${name}`);
-                console.log(`line length: ${line.length}`);
-                console.log(`dependencyStart: ${dependencyStart}`);
-                console.log(`dependencyEnd: ${dependencyEnd}`);
-                console.log(`versionStart: ${versionStart}`);
-                console.log(`versionEnd: ${versionEnd}`);
+                if (ignoreCurrentOrNext) {
+                    console.log(`name: ${name}`);
+                    console.log(`line length: ${line.length}`);
+                    console.log(`dependencyStart: ${dependencyStart}`);
+                    console.log(`dependencyEnd: ${dependencyEnd}`);
+                    console.log(`versionStart: ${versionStart}`);
+                    console.log(`versionEnd: ${versionEnd}`);
+                }
                 dependenciesList.push({
                     name: name,
+                    ignored: ignoreCurrentOrNext,
                     currentVersion: version[0],
                     dependencyStartOffset: dependencyStart,
                     dependencyEndOffset: dependencyEnd,
@@ -115,6 +125,8 @@ export function readPackageLines(
                     currentVersionEndOffset: versionEnd,
                     hasPrefix: hasPrefix
                 });
+                console.log('ignoreCurrentOrNext = false');
+                ignoreCurrentOrNext = false;
             }
             //  provider: ^6.0.3  
             // extensionHostProcess.js:105
@@ -155,6 +167,11 @@ export async function checkForUpdates(dependencies: Dependency[]): Promise<Depen
 
     for (const batch of batches) {
         const promises = batch.map(async (dependency) => {
+            if (dependency.ignored) {
+                dependency.updateAvailable = false;
+                return;
+            }
+
             const response = await fetchDependency(dependency);
             if (response !== null) {
                 const latestVersion = response.data.latest.version;

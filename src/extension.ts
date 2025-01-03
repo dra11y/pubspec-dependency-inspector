@@ -7,7 +7,7 @@ let customDiagnosticList: CustomDiagnostic[] = [];
 export function activate(context: vscode.ExtensionContext) {
 	let analyzingInProgress = false;
 
-	const diagnosticCollection = vscode.languages.createDiagnosticCollection("myExtension");
+	const diagnosticCollection = vscode.languages.createDiagnosticCollection("pubspec-dependency-inspector");
 
 
 	// console.log('Congratulations, your extension "pubspec-dependency-inspector" is now active!');
@@ -30,10 +30,10 @@ export function activate(context: vscode.ExtensionContext) {
 				let file = document.fileName.toString() ?? '';
 
 				let dependenciesList: Dependency[] = [];
-				
+
 				// const loadingSpinner = showLoadingSpinner();
 				const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-				
+
 				if (file !== '' && isPubspecFile(file)) {
 					// Set the text and show the loading spinner
 					statusBarItem.text = "$(sync~spin) Analyzing dependencies...";
@@ -53,11 +53,8 @@ export function activate(context: vscode.ExtensionContext) {
 						if (dependenciesList[i].updateAvailable) {
 							let dependency = dependenciesList[i];
 
-							// Clear any existing diagnostics for the document
-							// diagnosticCollection.clear();
-
 							let range = new vscode.Range(document.positionAt(dependency.dependencyStartOffset), document.positionAt(dependency.dependencyEndOffset));
-							let diagnostic = new vscode.Diagnostic(range, `${dependenciesList[i].name} has a update from ${dependenciesList[i].currentVersion} -> ${dependenciesList[i].latestVersion}`, vscode.DiagnosticSeverity.Warning);
+							let diagnostic = new vscode.Diagnostic(range, `${dependenciesList[i].name} has an update from ${dependenciesList[i].currentVersion} -> ${dependenciesList[i].latestVersion}`, vscode.DiagnosticSeverity.Warning);
 							let customDiagnostic: CustomDiagnostic = {
 								diagnostic: diagnostic,
 								dependency: dependenciesList[i]
@@ -69,7 +66,8 @@ export function activate(context: vscode.ExtensionContext) {
 						}
 					}
 
-					if (document !== undefined && isPubspecFile(file) && diagnosticList.length > 0) {
+					// Update the diagnostic list, or clear if last diagnostic resolved.
+					if (document !== undefined && isPubspecFile(file)) {
 						diagnosticCollection.set(document.uri, diagnosticList);
 					}
 
